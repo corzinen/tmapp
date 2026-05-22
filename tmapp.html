@@ -326,8 +326,6 @@
     border-radius: 3px 14px 3px 3px; /* folded corner look */
     border-style: solid;
     border-width: 1.5px;
-    min-width: 110px;
-    max-width: 200px;
     align-items: flex-start;
     justify-content: flex-start;
     padding: 10px 10px 8px 10px;
@@ -2327,6 +2325,8 @@ function saveSidebarState() {
 let dragInfo = null;
 let panDragInfo = null;
 let resizeInfo = null; // { id, dir, startX, startY, origX, origY, origW, origH }
+let lastNoteClickId = null;
+let lastNoteClickTime = 0;
 let svgLinePreview = null;
 let zoom = 1;
 let panX = 0, panY = 0;
@@ -3297,8 +3297,8 @@ function renderNodes() {
           <div class="note-body">${escHtml(node.noteText || 'Double-click to edit…')}</div>
         </div>
       `;
-      // Double-click to inline-edit note text
-      el.addEventListener('dblclick', (e) => { e.stopPropagation(); startNoteEdit(node.id); });
+      // dblclick handled in nodeMouseDown via manual detection (browser dblclick is
+      // unreliable here because renderNodes() recreates the element on the first click)
     } else {
       el.innerHTML = `
         <div class="node-box">
@@ -3829,6 +3829,18 @@ function nodeMouseDown(e, id) {
   }
   e.stopPropagation();
   if (!node) return;
+  // Manual double-click detection for note nodes — needed because renderNodes()
+  // recreates the element on the first click, so the browser never fires dblclick.
+  if (node.type === 'note') {
+    const now = Date.now();
+    if (lastNoteClickId === id && now - lastNoteClickTime < 400) {
+      lastNoteClickId = null;
+      startNoteEdit(id);
+      return;
+    }
+    lastNoteClickId = id;
+    lastNoteClickTime = now;
+  }
   dragInfo = {
     id,
     startX: e.clientX,
