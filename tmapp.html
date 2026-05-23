@@ -1191,9 +1191,11 @@
 
 
   /* ════════════ AI ANALYSIS ════════════ */
-  --ai: #a78bfa;
-  --ai2: #7c3aed;
-  --ai-glow: rgba(167,139,250,.18);
+  :root {
+    --ai: #a78bfa;
+    --ai2: #7c3aed;
+    --ai-glow: rgba(167,139,250,.18);
+  }
 
   /* AI tab button */
   .tab-btn.ai-tab { position: relative; }
@@ -1319,7 +1321,6 @@
   .ai-mode-btn:disabled { opacity: .45; cursor: not-allowed; }
   .ai-mode-btn.running { border-color: var(--ai); background: var(--ai-glow); }
   .ai-mode-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-  .ai-mode-text {}
   .ai-mode-name { font-weight: 500; color: var(--text); font-size: 11px; display: block; }
   .ai-mode-desc { font-size: 9px; color: var(--text3); margin-top: 2px; line-height: 1.4; display: block; }
 
@@ -2454,6 +2455,36 @@ function buildLibraryThreat(template, nodeId, stride) {
   };
 }
 
+function normalizeLibraryCategory(cat) {
+  const categoryMap = {
+    'Auth & Identity': 'Identity & Access',
+    'Identity + Security': 'Identity & Access',
+    'Enterprise & Cloud Identity Management': 'Identity & Access',
+    'Developer & Consumer Identity (CIAM)': 'Identity & Access',
+    'Specialized & Infrastructure-Native IdPs': 'Identity & Access',
+    'Web & Frontend': 'Applications & APIs',
+    'API & Middleware': 'Applications & APIs',
+    'Databases': 'Data & Storage',
+    'Databases + Analytics': 'Data & Storage',
+    'Storage': 'Data & Storage',
+    'Cloud & Infra': 'Cloud & Infrastructure',
+    'Compute': 'Cloud & Infrastructure',
+    'Networking': 'Cloud & Infrastructure',
+    'Management + Governance': 'Cloud & Infrastructure',
+    'AI + Machine Learning': 'Cloud & Infrastructure',
+    'Network & Security': 'Network & Edge',
+    'Network Vendor Platforms': 'Network & Edge',
+    'Operating Systems': 'Operating Systems',
+    'Endpoint & Extended Detection and Response (XDR)': 'Security Platforms',
+    'Network & Cloud Security': 'Security Platforms',
+    'Security Information & Event Management (SIEM)': 'Security Platforms',
+    'AI-Enabled & Cloud Security': 'Security Platforms',
+    'Email Security': 'Security Platforms',
+    'Managed Security Service Providers (MSSPs)': 'Security Platforms'
+  };
+  return categoryMap[cat] || cat;
+}
+
 // ═══════════════════════════════════════════════════════
 //  PERSISTENCE
 // ═══════════════════════════════════════════════════════
@@ -3109,17 +3140,13 @@ function exportDiagramImage() {
     if (node.type === 'note') {
       ctx.fillStyle = '#92400e';
       ctx.font = '10px "DM Mono", monospace';
-      ctx.textAlign = 'center';
       ctx.fillText('NOTE', x + w / 2, y + 14);
       ctx.fillStyle = '#713f12';
       ctx.font = 'italic 10px "DM Mono", monospace';
       const body = (node.noteText || 'Double-click to edit...').slice(0, 220);
       const lines = wrapCanvasText(ctx, body, Math.max(30, w - 14)).slice(0, 6);
-      const noteAlign = normalizeNoteAlign(node.noteAlign);
-      const noteTextX = noteAlign === 'left' ? (x + 8) : noteAlign === 'right' ? (x + w - 8) : (x + w / 2);
-      ctx.textAlign = noteAlign;
       lines.forEach((line, i) => {
-        ctx.fillText(line, noteTextX, y + 32 + i * 12);
+        ctx.fillText(line, x + w / 2, y + 32 + i * 12);
       });
     } else if (node.type === 'boundary') {
       ctx.fillStyle = nodeBoundary;
@@ -3260,7 +3287,6 @@ function ensureBoundarySizes() {
     if (!n.height) n.height = defaults.height;
     if (n.type === 'note') {
       if (n.noteText === undefined) n.noteText = '';
-      if (n.noteAlign === undefined) n.noteAlign = 'left';
     }
   });
   // Ensure curves array exists (migration from older saves)
@@ -3290,7 +3316,6 @@ function renderNodes() {
     const isNote     = node.type === 'note';
     const w = node.width  || defaults.width;
     const h = node.height || defaults.height;
-    const noteAlign = normalizeNoteAlign(node.noteAlign);
     el.style.width  = w + 'px';
     el.style.height = h + 'px';
 
@@ -3300,7 +3325,7 @@ function renderNodes() {
         <div class="node-box">
           ${threatCount > 0 ? `<div class="threat-badge">${threatCount}</div>` : ''}
           <div class="node-type">note</div>
-          <div class="note-body" style="text-align:${escAttr(noteAlign)}">${escHtml(node.noteText || 'Double-click to edit…')}</div>
+          <div class="note-body">${escHtml(node.noteText || 'Double-click to edit…')}</div>
         </div>
       `;
       // dblclick handled in nodeMouseDown via manual detection (browser dblclick is
@@ -4180,10 +4205,7 @@ function addNode(type, x, y) {
     width: defaults.width,
     height: defaults.height,
   };
-  if (type === 'note') {
-    node.noteText = '';
-    node.noteAlign = 'left';
-  }
+  if (type === 'note') node.noteText = '';
   state.nodes.push(node);
   save();
   renderNodes();
@@ -4228,13 +4250,11 @@ function startNoteEdit(id) {
   const ta = document.createElement('textarea');
   ta.value = node.noteText || '';
   ta.placeholder = 'Write your note here…';
-  const noteAlign = normalizeNoteAlign(node.noteAlign);
   ta.style.cssText = `
     width:100%; height:${h - 28}px; min-height:40px;
     background:transparent; border:none; outline:none; resize:none;
     font-family:'DM Mono',monospace; font-size:10px; font-style:italic;
     color:#d4c97a; line-height:1.55; padding:0; caret-color:#f6e47a;
-    text-align:${noteAlign};
   `;
   box.appendChild(ta);
   ta.focus();
@@ -4278,14 +4298,6 @@ function renderProps() {
         <textarea class="prop-input" style="min-height:100px;font-style:italic;color:#d4c97a"
           placeholder="Free-form notes…"
           oninput="updateNoteProp('${node.id}','noteText',this.value)">${escHtml(node.noteText||'')}</textarea>
-      </div>
-      <div class="prop-group">
-        <div class="prop-label">Text Align</div>
-        <select class="prop-input" onchange="updateNoteProp('${node.id}','noteAlign',this.value)">
-          <option value="left" ${normalizeNoteAlign(node.noteAlign) === 'left' ? 'selected' : ''}>Left</option>
-          <option value="center" ${normalizeNoteAlign(node.noteAlign) === 'center' ? 'selected' : ''}>Center</option>
-          <option value="right" ${normalizeNoteAlign(node.noteAlign) === 'right' ? 'selected' : ''}>Right</option>
-        </select>
         <div style="font-size:9px;color:var(--text3);margin-top:3px">Double-click note on canvas to inline-edit</div>
       </div>
       <div class="prop-group">
@@ -4443,17 +4455,13 @@ function straightenEdge(edgeId) {
 function updateNoteProp(id, key, val) {
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
-  if (key === 'noteAlign') val = normalizeNoteAlign(val);
   node[key] = val;
   save();
-  // Live-update note text/alignment on canvas without full re-render
+  // Live-update note text on canvas without full re-render
   const el = document.getElementById('node-' + id);
   if (el) {
     const body = el.querySelector('.note-body');
-    if (body) {
-      if (key === 'noteText') body.textContent = val || 'Double-click to edit…';
-      if (key === 'noteAlign') body.style.textAlign = val;
-    }
+    if (body) body.textContent = val || 'Double-click to edit…';
   }
 }
 
@@ -5584,10 +5592,6 @@ function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function normalizeNoteAlign(v) {
-  return v === 'center' || v === 'right' ? v : 'left';
-}
-
 let toastTimer;
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -5768,6 +5772,465 @@ const NODE_LIBRARY = [
   { id:'cloud-iac', cat:'Cloud & Infra', icon:'📝', name:'IaC Repository', type:'store',
     desc:'Infrastructure-as-code repo (Terraform, CloudFormation, Pulumi).',
     threats:['T','I'], tags:['terraform','iac','cloudformation','pulumi'] },
+  // ── Azure Cloud Services ───────────────────────────────
+  { id:'az-iot-hub', cat:'Integrations', icon:'📡', name:'Azure IoT Hub', type:'process',
+    desc:'Handles communication between cloud services and on-site devices such as printers.',
+    threats:['S','T','I','D'], tags:['azure','iot','hub','device','printer','telemetry'] },
+  { id:'az-data-factory', cat:'Integrations', icon:'🧭', name:'Azure Data Factory', type:'process',
+    desc:'Cloud data integration and pipeline orchestration service.',
+    threats:['T','I','R'], tags:['azure','datafactory','etl','pipeline','integration'] },
+  { id:'az-vnet', cat:'Networking', icon:'🌐', name:'Azure Virtual Network (VNet)', type:'boundary',
+    desc:'Azure network boundary for isolating and segmenting cloud resources.',
+    threats:['T','I'], tags:['azure','vnet','virtualnetwork','network','subnet'] },
+  { id:'az-lb', cat:'Networking', icon:'⚖', name:'Azure Load Balancer', type:'process',
+    desc:'Layer 4 load balancing for Azure workloads.',
+    threats:['D'], tags:['azure','loadbalancer','lb','traffic','balancing'] },
+  { id:'az-app-gw', cat:'Networking', icon:'🚪', name:'Azure Application Gateway', type:'process',
+    desc:'Layer 7 load balancer and reverse proxy with optional WAF capabilities.',
+    threats:['S','T','D'], tags:['azure','applicationgateway','waf','reverseproxy','gateway'] },
+  { id:'az-expressroute', cat:'Networking', icon:'🛣', name:'Azure ExpressRoute', type:'external',
+    desc:'Private connectivity between on-premises networks and Microsoft Azure.',
+    threats:['S','T','I'], tags:['azure','expressroute','privateconnect','wan','onprem'] },
+  { id:'az-vm', cat:'Compute', icon:'🖥', name:'Azure Virtual Machines', type:'process',
+    desc:'Azure infrastructure virtual machines for general-purpose workloads.',
+    threats:['E','T'], tags:['azure','vm','virtualmachine','compute','instance'] },
+  { id:'az-aks', cat:'Compute', icon:'⎈', name:'Azure Kubernetes Service (AKS)', type:'boundary',
+    desc:'Managed Kubernetes cluster for container orchestration on Azure.',
+    threats:['E','T','D'], tags:['azure','aks','kubernetes','container','cluster'] },
+  { id:'az-functions', cat:'Compute', icon:'λ', name:'Azure Functions', type:'process',
+    desc:'Serverless compute for event-driven Azure workloads.',
+    threats:['T','E','I'], tags:['azure','functions','serverless','faas','lambda'] },
+  { id:'az-app-service', cat:'Compute', icon:'⬚', name:'Azure App Service', type:'process',
+    desc:'Managed platform for hosting web apps, APIs, and background jobs.',
+    threats:['S','T','D'], tags:['azure','appservice','webapp','api','paas'] },
+  { id:'az-openai', cat:'AI + Machine Learning', icon:'🧠', name:'Azure OpenAI', type:'external',
+    desc:'Hosted OpenAI models and APIs through Azure infrastructure and controls.',
+    threats:['I','T','S'], tags:['azure','openai','llm','model','genai'] },
+  { id:'az-ml', cat:'AI + Machine Learning', icon:'📈', name:'Azure Machine Learning', type:'process',
+    desc:'Managed ML platform for training, deploying, and monitoring models.',
+    threats:['T','I','E'], tags:['azure','machinelearning','ml','model','training'] },
+  { id:'az-ai-search', cat:'AI + Machine Learning', icon:'🔎', name:'Azure AI Search', type:'store',
+    desc:'Managed search index and retrieval service for enterprise and AI apps.',
+    threats:['I','T'], tags:['azure','aisearch','search','index','retrieval'] },
+  { id:'az-foundry', cat:'AI + Machine Learning', icon:'✦', name:'Azure AI Foundry', type:'process',
+    desc:'Azure platform for building, evaluating, and operating AI applications.',
+    threats:['I','T','E'], tags:['azure','foundry','aistudio','genai','platform'] },
+  { id:'az-sql', cat:'Databases + Analytics', icon:'🗄', name:'Azure SQL Database', type:'store',
+    desc:'Managed relational SQL database service on Azure.',
+    threats:['T','I','D'], tags:['azure','sql','database','relational','paas'] },
+  { id:'az-cosmos', cat:'Databases + Analytics', icon:'🌌', name:'Azure Cosmos DB', type:'store',
+    desc:'Globally distributed NoSQL database service.',
+    threats:['T','I'], tags:['azure','cosmos','nosql','document','global'] },
+  { id:'az-postgres', cat:'Databases + Analytics', icon:'🐘', name:'Azure Database for PostgreSQL', type:'store',
+    desc:'Managed PostgreSQL database service on Azure.',
+    threats:['T','I','D'], tags:['azure','postgresql','postgres','database','relational'] },
+  { id:'az-fabric', cat:'Databases + Analytics', icon:'⬡', name:'Microsoft Fabric', type:'process',
+    desc:'Unified analytics platform for data engineering, integration, and BI.',
+    threats:['I','T','R'], tags:['microsoft','fabric','analytics','bi','data'] },
+  { id:'az-blob', cat:'Storage', icon:'🪣', name:'Azure Blob Storage', type:'store',
+    desc:'Object storage for blobs, backups, media, and unstructured files.',
+    threats:['I','T'], tags:['azure','blob','objectstorage','files','backup'] },
+  { id:'az-disk', cat:'Storage', icon:'💽', name:'Azure Disk Storage', type:'store',
+    desc:'Persistent disk storage for Azure virtual machines.',
+    threats:['I','T'], tags:['azure','disk','blockstorage','vm','persistent'] },
+  { id:'az-files', cat:'Storage', icon:'🗂', name:'Azure Files', type:'store',
+    desc:'Managed file shares accessible over SMB and NFS.',
+    threats:['I','T'], tags:['azure','files','fileshare','smb','nfs'] },
+  { id:'az-table', cat:'Storage', icon:'📋', name:'Azure Table Storage', type:'store',
+    desc:'NoSQL key-attribute storage for semi-structured data.',
+    threats:['I','T'], tags:['azure','table','nosql','kv','storage'] },
+  { id:'az-entra-id', cat:'Identity + Security', icon:'🪪', name:'Microsoft Entra ID', type:'process',
+    desc:'Microsoft cloud identity and access management service, formerly Azure AD.',
+    threats:['S','T','E'], tags:['microsoft','entra','azuread','identity','authentication'] },
+  { id:'az-key-vault', cat:'Identity + Security', icon:'🔐', name:'Azure Key Vault', type:'store',
+    desc:'Managed vault for secrets, keys, and certificates.',
+    threats:['I','T','E'], tags:['azure','keyvault','secrets','keys','certificates'] },
+  { id:'az-defender', cat:'Identity + Security', icon:'🛡', name:'Microsoft Defender for Cloud', type:'process',
+    desc:'Cloud security posture management and threat protection for Azure resources.',
+    threats:['D','R'], tags:['microsoft','defender','cloud','security','cspm'] },
+  { id:'az-monitor', cat:'Management + Governance', icon:'📊', name:'Azure Monitor', type:'process',
+    desc:'Telemetry, logs, metrics, and alerting service for Azure environments.',
+    threats:['I','R'], tags:['azure','monitor','logs','metrics','telemetry'] },
+  { id:'az-policy', cat:'Management + Governance', icon:'📐', name:'Azure Policy', type:'process',
+    desc:'Governance engine for enforcing compliance rules and resource standards.',
+    threats:['T','E'], tags:['azure','policy','governance','compliance','standards'] },
+  { id:'az-sentinel', cat:'Management + Governance', icon:'🚨', name:'Microsoft Sentinel', type:'process',
+    desc:'Cloud-native SIEM and SOAR platform for security analytics and response.',
+    threats:['I','R','D'], tags:['microsoft','sentinel','siem','soar','security'] },
+  { id:'az-arc', cat:'Management + Governance', icon:'🧩', name:'Azure Arc', type:'process',
+    desc:'Hybrid-cloud management plane for extending Azure governance to other environments.',
+    threats:['E','T','I'], tags:['azure','arc','hybrid','management','governance'] },
+  // ── AWS Cloud Services ────────────────────────────────
+  { id:'aws-ec2', cat:'Cloud & Infra', icon:'🖥', name:'Amazon EC2', type:'process',
+    desc:'Virtual servers for scalable cloud compute workloads.',
+    threats:['E','T'], tags:['aws','ec2','compute','vm','instance'] },
+  { id:'aws-lambda', cat:'Cloud & Infra', icon:'λ', name:'AWS Lambda', type:'process',
+    desc:'Serverless functions for event-driven workloads.',
+    threats:['T','E','I'], tags:['aws','lambda','serverless','faas','compute'] },
+  { id:'aws-eks', cat:'Cloud & Infra', icon:'⎈', name:'Amazon EKS', type:'boundary',
+    desc:'Managed Kubernetes service for containerized applications.',
+    threats:['E','T','D'], tags:['aws','eks','kubernetes','k8s','containers'] },
+  { id:'aws-s3', cat:'Storage', icon:'🪣', name:'Amazon S3', type:'store',
+    desc:'Object storage for data lakes, backups, and content.',
+    threats:['I','T'], tags:['aws','s3','object','storage','bucket'] },
+  { id:'aws-ebs', cat:'Storage', icon:'💽', name:'Amazon EBS', type:'store',
+    desc:'Block storage volumes for EC2 instances.',
+    threats:['I','T'], tags:['aws','ebs','block','storage','ec2'] },
+  { id:'aws-fsx', cat:'Storage', icon:'🗂', name:'Amazon FSx', type:'store',
+    desc:'Managed file systems for high-performance workloads.',
+    threats:['I','T'], tags:['aws','fsx','filesystems','nfs','smb'] },
+  { id:'aws-vpc', cat:'Networking', icon:'☁', name:'Amazon VPC', type:'boundary',
+    desc:'Isolated cloud networking for AWS resources.',
+    threats:['T','I'], tags:['aws','vpc','network','subnet','isolation'] },
+  { id:'aws-route53', cat:'Networking', icon:'🌍', name:'Amazon Route 53', type:'process',
+    desc:'Scalable DNS and domain routing service.',
+    threats:['S','T','D'], tags:['aws','route53','dns','domain','routing'] },
+  { id:'aws-cloudfront', cat:'Networking', icon:'🗂', name:'Amazon CloudFront', type:'external',
+    desc:'Global content delivery network for low-latency distribution.',
+    threats:['T','D'], tags:['aws','cloudfront','cdn','edge','delivery'] },
+  { id:'aws-rds', cat:'Databases + Analytics', icon:'🗄', name:'Amazon RDS', type:'store',
+    desc:'Managed relational databases including MySQL and PostgreSQL.',
+    threats:['T','I','D'], tags:['aws','rds','sql','mysql','postgresql'] },
+  { id:'aws-dynamodb', cat:'Databases + Analytics', icon:'💎', name:'Amazon DynamoDB', type:'store',
+    desc:'Managed NoSQL key-value and document database.',
+    threats:['T','I'], tags:['aws','dynamodb','nosql','kv','document'] },
+  { id:'aws-aurora', cat:'Databases + Analytics', icon:'🌌', name:'Amazon Aurora', type:'store',
+    desc:'High-performance managed relational database engine.',
+    threats:['T','I','D'], tags:['aws','aurora','sql','relational','database'] },
+  { id:'aws-athena', cat:'Databases + Analytics', icon:'🔎', name:'Amazon Athena', type:'process',
+    desc:'Serverless SQL query service for data in S3.',
+    threats:['I','T','D'], tags:['aws','athena','sql','query','s3'] },
+  { id:'aws-redshift', cat:'Databases + Analytics', icon:'📊', name:'Amazon Redshift', type:'store',
+    desc:'Managed data warehouse for petabyte-scale analytics.',
+    threats:['I','T','D'], tags:['aws','redshift','warehouse','analytics','bi'] },
+  { id:'aws-emr', cat:'Databases + Analytics', icon:'📈', name:'Amazon EMR', type:'process',
+    desc:'Managed big data platform for batch and stream processing.',
+    threats:['D','T','I'], tags:['aws','emr','bigdata','spark','hadoop'] },
+  { id:'aws-sagemaker', cat:'AI + Machine Learning', icon:'🧠', name:'Amazon SageMaker AI', type:'process',
+    desc:'Platform to build, train, and deploy machine learning models.',
+    threats:['I','T','E'], tags:['aws','sagemaker','ml','training','deployment'] },
+  { id:'aws-bedrock', cat:'AI + Machine Learning', icon:'✦', name:'Amazon Bedrock', type:'external',
+    desc:'Managed foundation models service for generative AI applications.',
+    threats:['I','T','S'], tags:['aws','bedrock','genai','llm','foundationmodels'] },
+  { id:'aws-rekognition', cat:'AI + Machine Learning', icon:'👁', name:'Amazon Rekognition', type:'external',
+    desc:'Image and video analysis service using computer vision models.',
+    threats:['I','T'], tags:['aws','rekognition','vision','image','video'] },
+  { id:'aws-lex', cat:'AI + Machine Learning', icon:'💬', name:'Amazon Lex', type:'external',
+    desc:'Conversational AI service for chatbots and voice assistants.',
+    threats:['S','I','T'], tags:['aws','lex','chatbot','nlp','voice'] },
+  { id:'aws-iam', cat:'Identity + Security', icon:'🔑', name:'AWS IAM', type:'process',
+    desc:'Identity and access management for users, roles, and policies.',
+    threats:['S','T','E'], tags:['aws','iam','identity','access','policy'] },
+  { id:'aws-shield', cat:'Identity + Security', icon:'🛡', name:'AWS Shield', type:'process',
+    desc:'Managed DDoS protection for internet-facing applications.',
+    threats:['D'], tags:['aws','shield','ddos','protection','security'] },
+  { id:'aws-guardduty', cat:'Identity + Security', icon:'🚨', name:'Amazon GuardDuty', type:'process',
+    desc:'Threat detection service for suspicious activity and compromise indicators.',
+    threats:['R','D','I'], tags:['aws','guardduty','threatdetection','security','findings'] },
+  { id:'aws-cloudwatch', cat:'Management + Governance', icon:'📊', name:'Amazon CloudWatch', type:'process',
+    desc:'Monitoring and observability for metrics, logs, and alarms.',
+    threats:['I','R'], tags:['aws','cloudwatch','monitoring','metrics','logs'] },
+  { id:'aws-cloudtrail', cat:'Management + Governance', icon:'📋', name:'AWS CloudTrail', type:'store',
+    desc:'Audit trail of account activity and API actions.',
+    threats:['R','I'], tags:['aws','cloudtrail','audit','api','activity'] },
+  { id:'aws-config', cat:'Management + Governance', icon:'📐', name:'AWS Config', type:'process',
+    desc:'Resource inventory, configuration history, and compliance tracking.',
+    threats:['T','R'], tags:['aws','config','inventory','compliance','governance'] },
+  // ── Google Cloud Services ──────────────────────────────
+  { id:'gcp-compute-engine', cat:'Cloud & Infra', icon:'🖥', name:'Compute Engine', type:'process',
+    desc:'Virtual machine instances for general-purpose compute.',
+    threats:['E','T'], tags:['gcp','computeengine','vm','compute','instance'] },
+  { id:'gcp-gke', cat:'Cloud & Infra', icon:'⎈', name:'Google Kubernetes Engine (GKE)', type:'boundary',
+    desc:'Managed Kubernetes platform for container orchestration.',
+    threats:['E','T','D'], tags:['gcp','gke','kubernetes','k8s','containers'] },
+  { id:'gcp-cloud-run', cat:'Cloud & Infra', icon:'🏃', name:'Cloud Run', type:'process',
+    desc:'Serverless containers for stateless HTTP workloads.',
+    threats:['T','E','I'], tags:['gcp','cloudrun','serverless','containers','compute'] },
+  { id:'gcp-cloud-storage', cat:'Storage', icon:'🪣', name:'Cloud Storage', type:'store',
+    desc:'Object storage for unstructured data and static assets.',
+    threats:['I','T'], tags:['gcp','cloudstorage','object','bucket','storage'] },
+  { id:'gcp-persistent-disk', cat:'Storage', icon:'💽', name:'Persistent Disk', type:'store',
+    desc:'Durable block storage for Compute Engine virtual machines.',
+    threats:['I','T'], tags:['gcp','persistentdisk','block','storage','vm'] },
+  { id:'gcp-filestore', cat:'Storage', icon:'🗂', name:'Filestore', type:'store',
+    desc:'Managed NFS file storage for shared workloads.',
+    threats:['I','T'], tags:['gcp','filestore','nfs','file','storage'] },
+  { id:'gcp-vpc', cat:'Networking', icon:'☁', name:'Virtual Private Cloud (VPC)', type:'boundary',
+    desc:'Virtual network for isolating and controlling cloud resources.',
+    threats:['T','I'], tags:['gcp','vpc','network','subnet','isolation'] },
+  { id:'gcp-load-balancing', cat:'Networking', icon:'⚖', name:'Cloud Load Balancing', type:'process',
+    desc:'Global and regional traffic distribution for applications.',
+    threats:['D','T'], tags:['gcp','loadbalancing','lb','traffic','network'] },
+  { id:'gcp-cloud-cdn', cat:'Networking', icon:'🗂', name:'Cloud CDN', type:'external',
+    desc:'Content delivery network for low-latency edge caching.',
+    threats:['T','D'], tags:['gcp','cdn','edge','cache','delivery'] },
+  { id:'gcp-cloud-sql', cat:'Databases + Analytics', icon:'🗄', name:'Cloud SQL', type:'store',
+    desc:'Managed relational databases for MySQL and PostgreSQL.',
+    threats:['T','I','D'], tags:['gcp','cloudsql','mysql','postgresql','relational'] },
+  { id:'gcp-spanner', cat:'Databases + Analytics', icon:'🌌', name:'Cloud Spanner', type:'store',
+    desc:'Globally distributed relational database with horizontal scale.',
+    threats:['T','I','D'], tags:['gcp','spanner','relational','distributed','sql'] },
+  { id:'gcp-firestore', cat:'Databases + Analytics', icon:'📄', name:'Firestore', type:'store',
+    desc:'NoSQL document database for web and mobile applications.',
+    threats:['T','I'], tags:['gcp','firestore','nosql','document','database'] },
+  { id:'gcp-bigquery', cat:'Databases + Analytics', icon:'📊', name:'BigQuery', type:'store',
+    desc:'Serverless data warehouse for large-scale analytics.',
+    threats:['I','T','D'], tags:['gcp','bigquery','warehouse','analytics','sql'] },
+  { id:'gcp-dataflow', cat:'Databases + Analytics', icon:'🌊', name:'Dataflow', type:'process',
+    desc:'Managed stream and batch data processing service.',
+    threats:['D','T','I'], tags:['gcp','dataflow','streaming','batch','etl'] },
+  { id:'gcp-looker', cat:'Databases + Analytics', icon:'📈', name:'Looker', type:'process',
+    desc:'Business intelligence and semantic modeling platform.',
+    threats:['I','R'], tags:['gcp','looker','bi','analytics','dashboards'] },
+  { id:'gcp-vertex-ai', cat:'AI + Machine Learning', icon:'🧠', name:'Vertex AI', type:'process',
+    desc:'Unified platform for building, training, and deploying ML and generative AI apps.',
+    threats:['I','T','E'], tags:['gcp','vertexai','ml','genai','models'] },
+  { id:'gcp-vision-ai', cat:'AI + Machine Learning', icon:'👁', name:'Vision AI', type:'external',
+    desc:'Image analysis APIs for labeling, OCR, and vision inference.',
+    threats:['I','T'], tags:['gcp','visionai','image','ocr','cv'] },
+  { id:'gcp-natural-language-ai', cat:'AI + Machine Learning', icon:'📝', name:'Natural Language AI', type:'external',
+    desc:'Natural language processing APIs for text understanding.',
+    threats:['I','T'], tags:['gcp','nlp','language','text','ai'] },
+  { id:'gcp-speech-to-text', cat:'AI + Machine Learning', icon:'🎤', name:'Speech-to-Text', type:'external',
+    desc:'Speech recognition service for transcribing audio streams and files.',
+    threats:['I','T'], tags:['gcp','speech','stt','audio','transcription'] },
+  { id:'gcp-gemini-agent-platform', cat:'AI + Machine Learning', icon:'✦', name:'Gemini Enterprise Agent Platform', type:'process',
+    desc:'Platform for building specialized enterprise AI agents.',
+    threats:['I','T','S'], tags:['gcp','gemini','agentic','agents','enterprise'] },
+  { id:'gcp-cloud-logging', cat:'Observability', icon:'📋', name:'Cloud Logging', type:'store',
+    desc:'Centralized log ingestion, storage, and querying.',
+    threats:['I','R'], tags:['gcp','logging','logs','observability','audit'] },
+  { id:'gcp-cloud-monitoring', cat:'Observability', icon:'📊', name:'Cloud Monitoring', type:'process',
+    desc:'Metrics, dashboards, alerting, and uptime monitoring.',
+    threats:['I','R'], tags:['gcp','monitoring','metrics','alerts','slo'] },
+  { id:'gcp-error-reporting', cat:'Observability', icon:'🐞', name:'Error Reporting', type:'process',
+    desc:'Application error aggregation and triage service.',
+    threats:['R','D'], tags:['gcp','errorreporting','errors','exceptions','ops'] },
+  { id:'gcp-cloud-build', cat:'Management + Governance', icon:'🔄', name:'Cloud Build', type:'process',
+    desc:'Managed CI/CD service for building and deploying software.',
+    threats:['T','E','S'], tags:['gcp','cloudbuild','cicd','pipeline','devops'] },
+  { id:'gcp-artifact-registry', cat:'Cloud & Infra', icon:'🗃', name:'Artifact Registry', type:'store',
+    desc:'Repository for container images and language packages.',
+    threats:['T','I'], tags:['gcp','artifactregistry','registry','images','packages'] },
+  { id:'gcp-cloud-functions', cat:'Cloud & Infra', icon:'λ', name:'Cloud Functions', type:'process',
+    desc:'Event-driven serverless functions for lightweight automation and APIs.',
+    threats:['T','E','I'], tags:['gcp','cloudfunctions','serverless','faas','events'] },
+  { id:'gcp-iam', cat:'Identity + Security', icon:'🔑', name:'IAM (Google Cloud)', type:'process',
+    desc:'Identity and access management with fine-grained policies.',
+    threats:['S','T','E'], tags:['gcp','iam','identity','access','policy'] },
+  { id:'gcp-kms', cat:'Identity + Security', icon:'🔐', name:'Cloud KMS', type:'store',
+    desc:'Managed key management for encryption keys and cryptographic operations.',
+    threats:['I','T','E'], tags:['gcp','kms','keys','encryption','crypto'] },
+  { id:'gcp-secret-manager', cat:'Identity + Security', icon:'🗝', name:'Secret Manager', type:'store',
+    desc:'Managed secrets storage with versioning and access controls.',
+    threats:['I','T','E'], tags:['gcp','secretmanager','secrets','credentials','vault'] },
+  // ── Security Vendor Platforms ──────────────────────────
+  { id:'sec-xdr-crowdstrike', cat:'Endpoint & Extended Detection and Response (XDR)', icon:'🛡', name:'CrowdStrike Falcon Platform', type:'process',
+    desc:'Cloud-native endpoint protection, advanced threat hunting, and next-gen SIEM.',
+    threats:['D','I','R'], tags:['crowdstrike','falcon','xdr','edr','siem','endpoint'] },
+  { id:'sec-xdr-microsoft', cat:'Endpoint & Extended Detection and Response (XDR)', icon:'🪟', name:'Microsoft Defender XDR', type:'process',
+    desc:'Unified threat monitoring across endpoints, identities, and cloud environments.',
+    threats:['D','I','R'], tags:['microsoft','defender','xdr','edr','endpoint','cloud'] },
+  { id:'sec-xdr-sentinelone', cat:'Endpoint & Extended Detection and Response (XDR)', icon:'🤖', name:'SentinelOne Platform', type:'process',
+    desc:'AI-powered autonomous endpoint protection and workload security.',
+    threats:['D','I','T'], tags:['sentinelone','xdr','edr','endpoint','workload','ai'] },
+  { id:'sec-net-paloalto', cat:'Network & Cloud Security', icon:'🧱', name:'Palo Alto Networks Prisma Access / Strata', type:'process',
+    desc:'Enterprise network firewall and zero-trust cloud security platform.',
+    threats:['S','T','D'], tags:['paloalto','prisma','strata','firewall','zero-trust','cloud'] },
+  { id:'sec-net-fortinet', cat:'Network & Cloud Security', icon:'🔥', name:'Fortinet FortiGate / FortiGuard', type:'process',
+    desc:'Integrated network security and secure SD-WAN platform.',
+    threats:['D','T','S'], tags:['fortinet','fortigate','fortiguard','sdwan','firewall','network'] },
+  { id:'sec-net-checkpoint', cat:'Network & Cloud Security', icon:'🛟', name:'Check Point Infinity Platform', type:'process',
+    desc:'Multi-level security architecture securing networks, clouds, and mobile devices.',
+    threats:['S','T','D'], tags:['checkpoint','infinity','cloud','mobile','network','security'] },
+  { id:'sec-siem-qradar', cat:'Security Information & Event Management (SIEM)', icon:'📡', name:'IBM QRadar SIEM', type:'process',
+    desc:'Modular threat detection, correlation, and deep infrastructure analytics.',
+    threats:['I','R','D'], tags:['ibm','qradar','siem','correlation','analytics'] },
+  { id:'sec-siem-rapid7', cat:'Security Information & Event Management (SIEM)', icon:'📈', name:'Rapid7 InsightIDR', type:'process',
+    desc:'Cloud SIEM with unlimited data ingestion and user behavior analytics.',
+    threats:['I','R','D'], tags:['rapid7','insightidr','siem','uba','analytics'] },
+  { id:'sec-siem-trellix', cat:'Security Information & Event Management (SIEM)', icon:'🗄', name:'Trellix Enterprise Security Manager (ESM)', type:'process',
+    desc:'Consolidates and prioritizes security events across complex environments.',
+    threats:['I','R','D'], tags:['trellix','esm','siem','events','prioritization'] },
+  { id:'sec-ai-google', cat:'AI-Enabled & Cloud Security', icon:'🧠', name:'Google Security (Mandiant + Gemini)', type:'process',
+    desc:'Unified AI-driven defense and security operations automation.',
+    threats:['D','I','R'], tags:['google','mandiant','gemini','ai','security','soar'] },
+  { id:'sec-email-barracuda', cat:'Email Security', icon:'✉', name:'Barracuda Email Security', type:'process',
+    desc:'Comprehensive email gateway defense, automated incident response, and inbox protection.',
+    threats:['S','T','I'], tags:['barracuda','email','gateway','phishing','inbox'] },
+  { id:'sec-mssp-arcticwolf', cat:'Managed Security Service Providers (MSSPs)', icon:'🐺', name:'Arctic Wolf', type:'process',
+    desc:'Continuous security operations and 24/7 monitoring as a concierge service.',
+    threats:['R','D'], tags:['arcticwolf','mssp','soc','monitoring','managed'] },
+  { id:'sec-mssp-netsurion', cat:'Managed Security Service Providers (MSSPs)', icon:'🌙', name:'Netsurion', type:'process',
+    desc:'24/7 Security Operations Center designed to integrate with existing infrastructure.',
+    threats:['R','D'], tags:['netsurion','mssp','soc','managed','monitoring'] },
+  { id:'idp-ms-entra', cat:'Enterprise & Cloud Identity Management', icon:'🪪', name:'Microsoft Entra ID', type:'process',
+    desc:'Market-leading identity and access management service deeply integrated with Microsoft 365 and hybrid environments.',
+    threats:['S','T','E'], tags:['microsoft','entra','azuread','sso','hybrid','identity'] },
+  { id:'idp-okta', cat:'Enterprise & Cloud Identity Management', icon:'🔑', name:'Okta Identity Cloud', type:'process',
+    desc:'Enterprise SSO and lifecycle management platform with thousands of integrations.',
+    threats:['S','T','E'], tags:['okta','sso','lifecycle','identity','integration'] },
+  { id:'idp-ping', cat:'Enterprise & Cloud Identity Management', icon:'⚡', name:'PingOne Cloud Platform', type:'process',
+    desc:'Highly scalable, AI-driven adaptive authentication for complex enterprise needs.',
+    threats:['S','T','E'], tags:['ping','pingone','forgeRock','adaptive','authentication'] },
+  { id:'idp-jumpcloud', cat:'Enterprise & Cloud Identity Management', icon:'☁', name:'JumpCloud Directory Platform', type:'process',
+    desc:'Cloud directory services, device management, and SSO for SMBs and remote workforces.',
+    threats:['S','T','E'], tags:['jumpcloud','directory','device','sso','cloud'] },
+  { id:'idp-oneidentity', cat:'Enterprise & Cloud Identity Management', icon:'🔐', name:'One Identity', type:'process',
+    desc:'Identity governance and intelligent authentication across enterprise environments.',
+    threats:['E','S','R'], tags:['oneidentity','onelogin','iga','authentication','governance'] },
+  { id:'ciam-auth0', cat:'Developer & Consumer Identity (CIAM)', icon:'🔓', name:'Auth0 Identity Platform', type:'process',
+    desc:'Developer-focused authentication and authorization platform for custom applications.',
+    threats:['S','T','E'], tags:['auth0','ciam','authentication','authorization','developer'] },
+  { id:'ciam-workos', cat:'Developer & Consumer Identity (CIAM)', icon:'🧩', name:'WorkOS', type:'process',
+    desc:'Enterprise-grade SSO and SCIM directory sync for B2B SaaS products.',
+    threats:['S','T'], tags:['workos','ciam','sso','scim','b2b'] },
+  { id:'idp-aws-identity-center', cat:'Specialized & Infrastructure-Native IdPs', icon:'aws', name:'AWS IAM Identity Center', type:'process',
+    desc:'Native identity management and SSO for Amazon Web Services environments.',
+    threats:['S','T','E'], tags:['aws','identitycenter','iam','sso','cloud'] },
+  { id:'idp-gcp-cloud-identity', cat:'Specialized & Infrastructure-Native IdPs', icon:'☁', name:'Google Cloud Identity', type:'process',
+    desc:'Identity service for organizations using Google Workspace and GCP infrastructures.',
+    threats:['S','T','E'], tags:['google','cloudidentity','workspace','gcp','identity'] },
+  { id:'idp-cyberark', cat:'Specialized & Infrastructure-Native IdPs', icon:'🛡', name:'CyberArk Identity', type:'process',
+    desc:'Workforce access, privileged identity orchestration, and secure credential management.',
+    threats:['S','T','E'], tags:['cyberark','identity','privileged','credentials','workforce'] },
+  { id:'idp-manageengine', cat:'Specialized & Infrastructure-Native IdPs', icon:'🧰', name:'ManageEngine AD360', type:'process',
+    desc:'On-premises and hybrid IAM solution for Active Directory management and user governance.',
+    threats:['S','T','R'], tags:['manageengine','ad360','directory','iam','hybrid'] },
+  { id:'idp-cisco-duo', cat:'Specialized & Infrastructure-Native IdPs', icon:'📱', name:'Cisco Duo', type:'process',
+    desc:'Access management focused on strong MFA and zero-trust security.',
+    threats:['S','D','E'], tags:['cisco','duo','mfa','zerotrust','access'] },
+  // ── Network Vendor Platforms ──────────────────────────
+  { id:'nv-cisco-catalyst', cat:'Network Vendor Platforms', icon:'🔀', name:'Cisco Catalyst Switches', type:'process',
+    desc:'Enterprise campus switching platform with broad Layer 2/3 capabilities.',
+    threats:['T','D'], tags:['cisco','catalyst','switch','campus','lan'] },
+  { id:'nv-cisco-nexus', cat:'Network Vendor Platforms', icon:'🧩', name:'Cisco Nexus Data Center Switches', type:'process',
+    desc:'High-density data center switches for leaf-spine architectures.',
+    threats:['T','D'], tags:['cisco','nexus','datacenter','switch','leafspine'] },
+  { id:'nv-cisco-isr-asr', cat:'Network Vendor Platforms', icon:'📡', name:'Cisco ISR / ASR Routers', type:'process',
+    desc:'Branch and edge routing platforms for WAN and service-provider use cases.',
+    threats:['S','T','D'], tags:['cisco','isr','asr','router','wan'] },
+  { id:'nv-cisco-firepower', cat:'Network Vendor Platforms', icon:'🛡', name:'Cisco Firepower Appliances', type:'process',
+    desc:'Security appliances combining firewalling, IPS, and advanced threat defense.',
+    threats:['S','T','D'], tags:['cisco','firepower','firewall','ips','security'] },
+  { id:'nv-cisco-meraki', cat:'Network Vendor Platforms', icon:'☁', name:'Cisco Meraki', type:'process',
+    desc:'Cloud-managed networking stack for branch, campus, and distributed sites.',
+    threats:['S','T','D'], tags:['cisco','meraki','cloudmanaged','network','wifi'] },
+  { id:'nv-cisco-dna-center', cat:'Network Vendor Platforms', icon:'🧠', name:'Cisco DNA Center', type:'process',
+    desc:'AI-assisted network operations, policy, and assurance platform.',
+    threats:['T','R','D'], tags:['cisco','dna','automation','assurance','aiops'] },
+  { id:'nv-cisco-sdwan', cat:'Network Vendor Platforms', icon:'🌐', name:'Cisco SD-WAN', type:'process',
+    desc:'Software-defined WAN overlay for policy-based branch and edge connectivity.',
+    threats:['S','T','D'], tags:['cisco','sdwan','wan','overlay','edge'] },
+  { id:'nv-juniper-ex', cat:'Network Vendor Platforms', icon:'🔀', name:'Juniper EX Series Switches', type:'process',
+    desc:'Ethernet campus and branch switching on Junos.',
+    threats:['T','D'], tags:['juniper','ex','switch','junos','campus'] },
+  { id:'nv-juniper-mx', cat:'Network Vendor Platforms', icon:'📡', name:'Juniper MX Series Routers', type:'process',
+    desc:'High-performance routing for edge, core, and service provider networks.',
+    threats:['S','T','D'], tags:['juniper','mx','router','core','wan'] },
+  { id:'nv-juniper-srx', cat:'Network Vendor Platforms', icon:'🛡', name:'Juniper SRX Series Firewalls', type:'process',
+    desc:'Next-generation firewall and secure gateway platform.',
+    threats:['S','T','D'], tags:['juniper','srx','firewall','security','ngfw'] },
+  { id:'nv-juniper-mist', cat:'Network Vendor Platforms', icon:'📶', name:'Juniper Mist AI', type:'process',
+    desc:'AI-native wireless and wired assurance for enterprise operations.',
+    threats:['T','R','D'], tags:['juniper','mist','ai','wireless','assurance'] },
+  { id:'nv-juniper-apstra', cat:'Network Vendor Platforms', icon:'🧭', name:'Juniper Apstra', type:'process',
+    desc:'Intent-based networking for automated data center operations.',
+    threats:['T','R'], tags:['juniper','apstra','intentbased','automation','datacenter'] },
+  { id:'nv-arista-7000', cat:'Network Vendor Platforms', icon:'⚡', name:'Arista 7000 Series Switches', type:'process',
+    desc:'High-speed leaf and spine switching for modern cloud data centers.',
+    threats:['T','D'], tags:['arista','7000','switch','leaf','spine'] },
+  { id:'nv-arista-eos', cat:'Network Vendor Platforms', icon:'🧩', name:'Arista EOS', type:'process',
+    desc:'Extensible network operating system for automation and reliability.',
+    threats:['T','R'], tags:['arista','eos','networkos','automation','telemetry'] },
+  { id:'nv-arista-cloudvision', cat:'Network Vendor Platforms', icon:'📊', name:'Arista CloudVision', type:'process',
+    desc:'Network-wide telemetry, automation, and orchestration platform.',
+    threats:['R','D'], tags:['arista','cloudvision','automation','telemetry','ops'] },
+  { id:'nv-fortinet-devices', cat:'Network Vendor Platforms', icon:'🔥', name:'Fortinet Device Stack', type:'process',
+    desc:'FortiGate NGFW, FortiSwitch, and FortiAP for integrated branch and campus security.',
+    threats:['S','T','D'], tags:['fortinet','fortigate','fortiswitch','fortiap','ngfw'] },
+  { id:'nv-fortinet-solutions', cat:'Network Vendor Platforms', icon:'🌐', name:'Fortinet SD-WAN + FortiManager', type:'process',
+    desc:'Integrated SD-WAN and centralized lifecycle management for distributed networks.',
+    threats:['T','R','D'], tags:['fortinet','sdwan','fortimanager','management','wan'] },
+  { id:'nv-aruba-devices', cat:'Network Vendor Platforms', icon:'📶', name:'HPE Aruba 6000/8000 CX + APs', type:'process',
+    desc:'Edge-to-cloud switching and high-density wireless access infrastructure.',
+    threats:['T','D'], tags:['aruba','hpe','cx','switch','accesspoint'] },
+  { id:'nv-aruba-central-clearpass', cat:'Network Vendor Platforms', icon:'🔐', name:'Aruba Central + ClearPass', type:'process',
+    desc:'Cloud-native management and network access control for policy enforcement.',
+    threats:['S','T','E'], tags:['aruba','central','clearpass','nac','policy'] },
+  { id:'nv-paloalto-devices', cat:'Network Vendor Platforms', icon:'🛡', name:'Palo Alto PA / VM-Series Firewalls', type:'process',
+    desc:'Physical and virtual firewalls for branch, data center, and cloud edge.',
+    threats:['S','T','D'], tags:['paloalto','pa-series','vm-series','firewall','ngfw'] },
+  { id:'nv-paloalto-solutions', cat:'Network Vendor Platforms', icon:'☁', name:'Palo Alto Prisma SASE + Panorama', type:'process',
+    desc:'Secure access service edge and centralized network security management.',
+    threats:['S','T','R'], tags:['paloalto','prisma','sase','panorama','management'] },
+  { id:'nv-ubiquiti-unifi', cat:'Network Vendor Platforms', icon:'📡', name:'Ubiquiti UniFi Ecosystem', type:'process',
+    desc:'License-free cloud-managed platform with Dream Machines, UniFi switches, and U7 Pro APs.',
+    threats:['S','T','D'], tags:['ubiquiti','unifi','dreammachine','u7pro','cloudmanaged'] },
+  { id:'nv-mikrotik-platform', cat:'Network Vendor Platforms', icon:'🧰', name:'MikroTik RouterOS Platform', type:'process',
+    desc:'Flexible low-cost networking with Cloud Core Routers and Cloud Smart Switches.',
+    threats:['T','D'], tags:['mikrotik','routeros','ccr','css','routing'] },
+  { id:'nv-netgear-business', cat:'Network Vendor Platforms', icon:'🔌', name:'Netgear Business Networking', type:'process',
+    desc:'ProSAFE managed switching and Insight-managed wireless for SMB environments.',
+    threats:['T','D'], tags:['netgear','prosafe','insight','switch','wireless'] },
+  { id:'nv-nvidia-networking', cat:'Network Vendor Platforms', icon:'⚙', name:'NVIDIA Spectrum + InfiniBand', type:'process',
+    desc:'High-performance Ethernet and InfiniBand fabrics for AI and HPC clusters.',
+    threats:['D','T'], tags:['nvidia','mellanox','spectrum','infiniband','hpc'] },
+  { id:'nv-extremecloud-iq', cat:'Network Vendor Platforms', icon:'🏟', name:'ExtremeCloud IQ', type:'process',
+    desc:'Cloud-managed networking for high-density environments such as hospitals and stadiums.',
+    threats:['T','R','D'], tags:['extreme','extremecloud','iq','cloudmanaged','wifi'] },
+  { id:'nv-huawei-core-5g', cat:'Network Vendor Platforms', icon:'📶', name:'Huawei Core + 5G Infrastructure', type:'process',
+    desc:'Carrier and enterprise networking stack spanning core routing and 5G infrastructure.',
+    threats:['S','T','D'], tags:['huawei','core','5g','serviceprovider','network'] },
+  // ── Operating Systems ──────────────────────────────────
+  { id:'os-microsoft-client', cat:'Operating Systems', icon:'🪟', name:'Windows 11 / 10 / IoT', type:'process',
+    desc:'Desktop and embedded client operating systems for enterprise and endpoint devices.',
+    threats:['E','T','I'], tags:['windows11','windows10','windowsiot','microsoft','clientos'] },
+  { id:'os-apple-client', cat:'Operating Systems', icon:'🍎', name:'macOS + iPadOS', type:'process',
+    desc:'Apple desktop and tablet operating systems used for productivity and endpoint security.',
+    threats:['E','T','I'], tags:['macos','ipados','apple','desktop','endpoint'] },
+  { id:'os-chromeos', cat:'Operating Systems', icon:'🌐', name:'ChromeOS', type:'process',
+    desc:'Lightweight cloud-first operating system for enterprise and education devices.',
+    threats:['S','T','I'], tags:['chromeos','chromebook','google','client','workspace'] },
+  { id:'os-popos', cat:'Operating Systems', icon:'🐧', name:'Pop!_OS (System76)', type:'process',
+    desc:'Linux distribution optimized for creators, developers, and STEM workflows.',
+    threats:['T','I'], tags:['popos','system76','linux','developer','workstation'] },
+  { id:'os-ubuntu-server', cat:'Operating Systems', icon:'🐧', name:'Ubuntu Server', type:'process',
+    desc:'Widely adopted Linux server platform for cloud and web infrastructure.',
+    threats:['T','I','D'], tags:['ubuntu','server','canonical','linux','cloud'] },
+  { id:'os-rhel', cat:'Operating Systems', icon:'🎩', name:'Red Hat Enterprise Linux (RHEL)', type:'process',
+    desc:'Enterprise Linux platform emphasizing stability, security, and support.',
+    threats:['T','I','D'], tags:['rhel','redhat','linux','enterprise','ibm'] },
+  { id:'os-windows-server', cat:'Operating Systems', icon:'🪟', name:'Windows Server 2022/2025', type:'process',
+    desc:'Server OS for Active Directory and enterprise application hosting.',
+    threats:['S','T','E'], tags:['windowsserver','activedirectory','microsoft','server'] },
+  { id:'os-sles', cat:'Operating Systems', icon:'🦎', name:'SUSE Linux Enterprise Server (SLES)', type:'process',
+    desc:'Enterprise Linux distribution for mission-critical and SAP workloads.',
+    threats:['T','I','D'], tags:['sles','suse','linux','sap','enterprise'] },
+  { id:'os-oracle-linux', cat:'Operating Systems', icon:'🟥', name:'Oracle Linux', type:'process',
+    desc:'Enterprise Linux tuned for Oracle database and integrated cloud services.',
+    threats:['T','I','D'], tags:['oraclelinux','oracle','linux','database','server'] },
+  { id:'os-android-wear', cat:'Operating Systems', icon:'🤖', name:'Android + Wear OS', type:'process',
+    desc:'Mobile and wearable operating systems built on Google Android ecosystems.',
+    threats:['S','I','T'], tags:['android','wearos','google','mobile','wearable'] },
+  { id:'os-apple-mobile', cat:'Operating Systems', icon:'📱', name:'iOS + watchOS + visionOS', type:'process',
+    desc:'Apple mobile, wearable, and spatial computing operating systems.',
+    threats:['S','I','T'], tags:['ios','watchos','visionos','apple','mobile'] },
+  { id:'os-tizen', cat:'Operating Systems', icon:'📺', name:'Samsung Tizen OS', type:'process',
+    desc:'Operating system for Samsung smart TVs and appliances.',
+    threats:['S','T','I'], tags:['tizen','samsung','smarttv','iot','appliance'] },
+  { id:'os-harmonyos', cat:'Operating Systems', icon:'🛰', name:'Huawei HarmonyOS', type:'process',
+    desc:'Cross-device operating system for Huawei mobile and smart ecosystems.',
+    threats:['S','T','I'], tags:['harmonyos','huawei','mobile','crossdevice','iot'] },
+  { id:'os-freebsd', cat:'Operating Systems', icon:'😈', name:'FreeBSD', type:'process',
+    desc:'Unix-like operating system known for advanced networking and storage features.',
+    threats:['T','I','D'], tags:['freebsd','unix','networking','storage','foundation'] },
+  { id:'os-debian', cat:'Operating Systems', icon:'🌀', name:'Debian Linux', type:'process',
+    desc:'Stable Linux distribution and foundation for many downstream projects.',
+    threats:['T','I','D'], tags:['debian','linux','stable','server','community'] },
+  { id:'os-fedora', cat:'Operating Systems', icon:'🎯', name:'Fedora Linux', type:'process',
+    desc:'Cutting-edge Linux distribution and proving ground for Red Hat technologies.',
+    threats:['T','I','D'], tags:['fedora','linux','redhat','community','innovation'] },
   // ── Network & Security ──────────────────────────────────
   { id:'net-firewall', cat:'Network & Security', icon:'🔥', name:'Firewall', type:'boundary',
     desc:'Network firewall enforcing ingress/egress rules.',
@@ -5856,6 +6319,43 @@ const NODE_LIBRARY = [
   { id:'obs-alerting', cat:'Observability', icon:'🚨', name:'Alerting Engine', type:'process',
     desc:'Alert manager processing and routing notifications on anomalies.',
     threats:['D'], tags:['alerting','pagerduty','opsgenie','alertmanager'] },
+  // ── Unified Observability Platforms ───────────────────
+  { id:'obs-datadog', cat:'Observability', icon:'🐶', name:'Datadog', type:'process',
+    desc:'Cloud-native observability platform known for high-speed indexing and ease of use.',
+    threats:['I','R','D'], tags:['datadog','observability','apm','logs','metrics','indexing'] },
+  { id:'obs-newrelic', cat:'Observability', icon:'💚', name:'New Relic One', type:'process',
+    desc:'All-in-one observability platform with deep code-level insights, Pixie eBPF monitoring, and Errors Inbox.',
+    threats:['I','R','D'], tags:['newrelic','newrelicone','pixie','ebpf','errorsinbox','apm'] },
+  { id:'obs-dynatrace', cat:'Observability', icon:'🧠', name:'Dynatrace (Davis AI)', type:'process',
+    desc:'AI-driven observability platform focused on automated root-cause analysis.',
+    threats:['I','R','D'], tags:['dynatrace','davis','aiops','rootcause','apm','observability'] },
+  { id:'obs-splunk', cat:'Observability', icon:'📈', name:'Splunk (Cisco)', type:'store',
+    desc:'Log-centric analytics platform for large-scale observability and security operations.',
+    threats:['I','R','D'], tags:['splunk','cisco','logs','siem','securityops','analytics'] },
+  { id:'obs-grafana', cat:'Observability', icon:'📊', name:'Grafana Labs', type:'process',
+    desc:'Visualization and dashboarding platform for metrics, logs, and traces.',
+    threats:['I','R'], tags:['grafana','dashboards','visualization','loki','tempo','prometheus'] },
+  { id:'obs-elastic', cat:'Observability', icon:'🔍', name:'Elastic Observability', type:'store',
+    desc:'Unified logging, search, and security analytics platform built on Elasticsearch.',
+    threats:['I','R','D'], tags:['elastic','elasticsearch','kibana','logging','security','observability'] },
+  { id:'obs-aws-cloudwatch-xray', cat:'Observability', icon:'☁', name:'AWS CloudWatch + X-Ray', type:'process',
+    desc:'AWS observability stack for metrics, logs, alarms, and distributed tracing.',
+    threats:['I','R','D'], tags:['aws','cloudwatch','xray','metrics','logs','tracing'] },
+  { id:'obs-gcp-observability', cat:'Observability', icon:'☁', name:'Google Cloud Observability', type:'process',
+    desc:'Google Cloud observability suite (formerly Stackdriver) for telemetry and operations.',
+    threats:['I','R','D'], tags:['gcp','googlecloud','stackdriver','logging','monitoring','tracing'] },
+  { id:'obs-azure-monitor-appinsights', cat:'Observability', icon:'☁', name:'Azure Monitor + Application Insights', type:'process',
+    desc:'Azure telemetry platform for metrics, logs, and application performance diagnostics.',
+    threats:['I','R','D'], tags:['azure','monitor','applicationinsights','apm','logs','metrics'] },
+  { id:'obs-honeycomb', cat:'Observability', icon:'🍯', name:'Honeycomb', type:'process',
+    desc:'High-cardinality observability platform for debugging complex distributed systems behavior.',
+    threats:['I','R'], tags:['honeycomb','highcardinality','debugging','distributed','observability'] },
+  { id:'obs-appdynamics', cat:'Observability', icon:'📉', name:'AppDynamics (Cisco)', type:'process',
+    desc:'Business transaction monitoring platform focused on application performance and user experience.',
+    threats:['I','R','D'], tags:['appdynamics','cisco','btm','apm','userexperience','transactions'] },
+  { id:'obs-riverbed', cat:'Observability', icon:'🌊', name:'Riverbed Observability', type:'process',
+    desc:'Network and end-user device observability for distributed enterprise environments.',
+    threats:['I','R','D'], tags:['riverbed','networkobservability','digitalexperience','devices','telemetry'] },
   // ── Trust Boundaries ────────────────────────────────────
   { id:'bnd-internet', cat:'Boundaries', icon:'🌐', name:'Internet / Public Zone', type:'boundary',
     desc:'Untrusted public internet zone.',
@@ -5896,7 +6396,7 @@ const NODE_LIBRARY = [
     threats:[], tags:['scope','boundary','oos','in-scope','note'] },
 ];
 
-const LIB_CATS = ['All', ...Array.from(new Set(NODE_LIBRARY.map(n => n.cat)))];
+const LIB_CATS = ['All', ...Array.from(new Set(NODE_LIBRARY.map(n => normalizeLibraryCategory(n.cat))))];
 let libCurrentCat = 'All';
 
 function openLibrary() {
@@ -5919,12 +6419,16 @@ function libOverlayClick(e) {
 function renderLibrarySidebar() {
   const sidebar = document.getElementById('lib-sidebar');
   const catIcons = {
-    'All':'⊞','Auth & Identity':'🔑','Web & Frontend':'🌐','API & Middleware':'⚡',
-    'Databases':'🗄','Cloud & Infra':'☁','Network & Security':'🔒','Users & Actors':'👤',
+    'All':'⊞','Identity & Access':'🔑','Applications & APIs':'⚡','Data & Storage':'🗄',
+    'Cloud & Infrastructure':'☁','Network & Edge':'🌐','Operating Systems':'💻',
+    'Security Platforms':'🛡','Users & Actors':'👤',
     'Integrations':'🔗','Observability':'📊','Boundaries':'🏗','Notes':'📝'
   };
   const counts = {};
-  NODE_LIBRARY.forEach(n => { counts[n.cat] = (counts[n.cat]||0)+1; });
+  NODE_LIBRARY.forEach(n => {
+    const cat = normalizeLibraryCategory(n.cat);
+    counts[cat] = (counts[cat]||0) + 1;
+  });
   counts['All'] = NODE_LIBRARY.length;
 
   sidebar.innerHTML = LIB_CATS.map(cat => `
@@ -5947,14 +6451,14 @@ function renderLibrary() {
   const grid = document.getElementById('lib-grid');
 
   const items = NODE_LIBRARY.filter(n => {
-    const catMatch = libCurrentCat === 'All' || n.cat === libCurrentCat;
+    const catMatch = libCurrentCat === 'All' || normalizeLibraryCategory(n.cat) === libCurrentCat;
     if (!catMatch) return false;
     if (!query) return true;
     return (
       n.name.toLowerCase().includes(query) ||
       n.desc.toLowerCase().includes(query) ||
       n.tags.some(t => t.includes(query)) ||
-      n.cat.toLowerCase().includes(query)
+      normalizeLibraryCategory(n.cat).toLowerCase().includes(query)
     );
   });
 
@@ -6019,7 +6523,6 @@ function placeLibNode(id) {
   if (template.type === 'note') {
     node.width = 180; node.height = 110;
     node.noteText = template.desc;
-    node.noteAlign = 'left';
   }
 
   state.nodes.push(node);
