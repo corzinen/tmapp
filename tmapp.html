@@ -3109,13 +3109,17 @@ function exportDiagramImage() {
     if (node.type === 'note') {
       ctx.fillStyle = '#92400e';
       ctx.font = '10px "DM Mono", monospace';
+      ctx.textAlign = 'center';
       ctx.fillText('NOTE', x + w / 2, y + 14);
       ctx.fillStyle = '#713f12';
       ctx.font = 'italic 10px "DM Mono", monospace';
       const body = (node.noteText || 'Double-click to edit...').slice(0, 220);
       const lines = wrapCanvasText(ctx, body, Math.max(30, w - 14)).slice(0, 6);
+      const noteAlign = normalizeNoteAlign(node.noteAlign);
+      const noteTextX = noteAlign === 'left' ? (x + 8) : noteAlign === 'right' ? (x + w - 8) : (x + w / 2);
+      ctx.textAlign = noteAlign;
       lines.forEach((line, i) => {
-        ctx.fillText(line, x + w / 2, y + 32 + i * 12);
+        ctx.fillText(line, noteTextX, y + 32 + i * 12);
       });
     } else if (node.type === 'boundary') {
       ctx.fillStyle = nodeBoundary;
@@ -3256,6 +3260,7 @@ function ensureBoundarySizes() {
     if (!n.height) n.height = defaults.height;
     if (n.type === 'note') {
       if (n.noteText === undefined) n.noteText = '';
+      if (n.noteAlign === undefined) n.noteAlign = 'left';
     }
   });
   // Ensure curves array exists (migration from older saves)
@@ -3285,6 +3290,7 @@ function renderNodes() {
     const isNote     = node.type === 'note';
     const w = node.width  || defaults.width;
     const h = node.height || defaults.height;
+    const noteAlign = normalizeNoteAlign(node.noteAlign);
     el.style.width  = w + 'px';
     el.style.height = h + 'px';
 
@@ -3294,7 +3300,7 @@ function renderNodes() {
         <div class="node-box">
           ${threatCount > 0 ? `<div class="threat-badge">${threatCount}</div>` : ''}
           <div class="node-type">note</div>
-          <div class="note-body">${escHtml(node.noteText || 'Double-click to edit…')}</div>
+          <div class="note-body" style="text-align:${escAttr(noteAlign)}">${escHtml(node.noteText || 'Double-click to edit…')}</div>
         </div>
       `;
       // dblclick handled in nodeMouseDown via manual detection (browser dblclick is
@@ -4174,7 +4180,10 @@ function addNode(type, x, y) {
     width: defaults.width,
     height: defaults.height,
   };
-  if (type === 'note') node.noteText = '';
+  if (type === 'note') {
+    node.noteText = '';
+    node.noteAlign = 'left';
+  }
   state.nodes.push(node);
   save();
   renderNodes();
@@ -4219,11 +4228,13 @@ function startNoteEdit(id) {
   const ta = document.createElement('textarea');
   ta.value = node.noteText || '';
   ta.placeholder = 'Write your note here…';
+  const noteAlign = normalizeNoteAlign(node.noteAlign);
   ta.style.cssText = `
     width:100%; height:${h - 28}px; min-height:40px;
     background:transparent; border:none; outline:none; resize:none;
     font-family:'DM Mono',monospace; font-size:10px; font-style:italic;
     color:#d4c97a; line-height:1.55; padding:0; caret-color:#f6e47a;
+    text-align:${noteAlign};
   `;
   box.appendChild(ta);
   ta.focus();
@@ -4267,6 +4278,14 @@ function renderProps() {
         <textarea class="prop-input" style="min-height:100px;font-style:italic;color:#d4c97a"
           placeholder="Free-form notes…"
           oninput="updateNoteProp('${node.id}','noteText',this.value)">${escHtml(node.noteText||'')}</textarea>
+      </div>
+      <div class="prop-group">
+        <div class="prop-label">Text Align</div>
+        <select class="prop-input" onchange="updateNoteProp('${node.id}','noteAlign',this.value)">
+          <option value="left" ${normalizeNoteAlign(node.noteAlign) === 'left' ? 'selected' : ''}>Left</option>
+          <option value="center" ${normalizeNoteAlign(node.noteAlign) === 'center' ? 'selected' : ''}>Center</option>
+          <option value="right" ${normalizeNoteAlign(node.noteAlign) === 'right' ? 'selected' : ''}>Right</option>
+        </select>
         <div style="font-size:9px;color:var(--text3);margin-top:3px">Double-click note on canvas to inline-edit</div>
       </div>
       <div class="prop-group">
@@ -4424,13 +4443,17 @@ function straightenEdge(edgeId) {
 function updateNoteProp(id, key, val) {
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
+  if (key === 'noteAlign') val = normalizeNoteAlign(val);
   node[key] = val;
   save();
-  // Live-update note text on canvas without full re-render
+  // Live-update note text/alignment on canvas without full re-render
   const el = document.getElementById('node-' + id);
   if (el) {
     const body = el.querySelector('.note-body');
-    if (body) body.textContent = val || 'Double-click to edit…';
+    if (body) {
+      if (key === 'noteText') body.textContent = val || 'Double-click to edit…';
+      if (key === 'noteAlign') body.style.textAlign = val;
+    }
   }
 }
 
@@ -5561,6 +5584,10 @@ function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function normalizeNoteAlign(v) {
+  return v === 'center' || v === 'right' ? v : 'left';
+}
+
 let toastTimer;
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -5992,6 +6019,7 @@ function placeLibNode(id) {
   if (template.type === 'note') {
     node.width = 180; node.height = 110;
     node.noteText = template.desc;
+    node.noteAlign = 'left';
   }
 
   state.nodes.push(node);
